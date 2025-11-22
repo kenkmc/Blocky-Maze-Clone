@@ -6,6 +6,8 @@
 
  [x] Customize the Project — Implemented Blockly workspace, maze runtime, custom levels, and UI to mirror Blockly Games Maze behaviour.
 
+ [x] Internationalization — Implemented English and Traditional Chinese translations for UI, blocks, and level solutions.
+
  [x] Install Required Extensions — No additional extensions required beyond defaults.
 
  [x] Compile the Project — `npm run build` completes without errors (chunk-size warning from Blockly noted).

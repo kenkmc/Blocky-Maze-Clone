@@ -175,7 +175,8 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 7,
     intro: 'Climb the hallway, then turn left toward the beacon.',
-    toolbox: toolboxTurns
+    toolbox: toolboxTurns,
+    solution: 'Move forward twice, turn left, move forward three times, turn right, move forward twice.'
   },
   {
     id: 4,
@@ -192,7 +193,8 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 9,
     intro: 'Alternate left and right to weave through the zig-zag corridor.',
-    toolbox: toolboxTurns
+    toolbox: toolboxTurns,
+    solution: 'Move forward twice, turn left, move forward twice, turn right, move forward twice, turn left, move forward twice.'
   },
   {
     id: 5,
@@ -209,10 +211,28 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'west',
     maxBlocks: 8,
     intro: 'Start by turning around—escape the cul-de-sac and reach the goal.',
-    toolbox: toolboxTurns
+    toolbox: toolboxTurns,
+    solution: 'Move forward twice, turn right, move forward three times, turn right, move forward twice.'
   },
   {
     id: 6,
+    name: 'Square Route',
+    map: [
+      '#######',
+      '#.....#',
+      '#.###.#',
+      '#.###.#',
+      '#S...G#',
+      '#######'
+    ],
+    startDirection: 'north',
+    maxBlocks: 10,
+    intro: 'A square path is perfect for a loop. Can you solve this with fewer blocks?',
+    toolbox: toolboxRepeat,
+    solution: 'Move forward 3 times, turn right, move forward 4 times, turn right, move forward 3 times. Or use a loop!'
+  },
+  {
+    id: 7,
     name: 'Step Ladder',
     map: [
       '########',
@@ -226,29 +246,32 @@ const rawLevels: MazeLevelDefinition[] = [
     ],
     startDirection: 'east',
     maxBlocks: 9,
-    intro: 'Climb the step ladder—look for patterns you can repeat.',
-    toolbox: toolboxRepeat
-  },
-  {
-    id: 7,
-    name: 'Loop Lane',
-    map: [
-      '########',
-      '###...G#',
-      '###.####',
-      '###.####',
-      '###...##',
-      '#####.##',
-      '#S....##',
-      '########'
-    ],
-    startDirection: 'east',
-    maxBlocks: 12,
-    intro: 'Loop around the long lane; a repeat block keeps instructions short.',
-    toolbox: toolboxCountLoops
+    intro: 'Climb the step ladder—look for patterns you can repeat until you reach the goal.',
+    toolbox: toolboxRepeat,
+    solution: 'Move forward twice, turn left, move forward, turn right. Repeat this pattern to climb the ladder.'
   },
   {
     id: 8,
+    name: 'The Staircase',
+    map: [
+      '#########',
+      '#####G..#',
+      '#####.###',
+      '###...###',
+      '###.#####',
+      '#...#####',
+      '#.#######',
+      '#S#######',
+      '#########'
+    ],
+    startDirection: 'north',
+    maxBlocks: 12,
+    intro: 'A repeating pattern of steps. Use the "repeat" block to climb it efficiently.',
+    toolbox: toolboxCountLoops,
+    solution: 'Repeat 3 times: Move forward 2, Turn Right, Move forward 2, Turn Left.'
+  },
+  {
+    id: 9,
     name: 'Spiral In',
     map: [
       '#########',
@@ -264,10 +287,11 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 16,
     intro: 'Follow the spiral inward without losing track of your heading.',
-    toolbox: toolboxCountLoops
+    toolbox: toolboxCountLoops,
+    solution: 'Follow the spiral path to the center.'
   },
   {
-    id: 9,
+    id: 10,
     name: 'Southbound Sweep',
     map: [
       '#########',
@@ -283,10 +307,11 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'south',
     maxBlocks: 10,
     intro: 'Head south first, then cruise east across the warehouse floor.',
-    toolbox: toolboxCountLoops
+    toolbox: toolboxCountLoops,
+    solution: 'Move forward 5 times, turn left, move forward 6 times.'
   },
   {
-    id: 10,
+    id: 11,
     name: 'Double Bend',
     map: [
       '#########',
@@ -302,29 +327,30 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 14,
     intro: 'Negotiate two tight bends in succession without wasting moves.',
-    toolbox: toolboxCountLoops
-  },
-  {
-    id: 11,
-    name: 'Fork Intro',
-    map: [
-      '#########',
-      '#########',
-      '#########',
-      '######.G#',
-      '######.##',
-      '######.##',
-      '####...##',
-      '#S.....##',
-      '#########'
-    ],
-    startDirection: 'east',
-    maxBlocks: 11,
-    intro: 'Choose the correct fork—the upper branch reaches the finish.',
-    toolbox: toolboxSensing
+    toolbox: toolboxCountLoops,
+    solution: 'Move forward 3, turn left, move forward 3, turn left, move forward 3, turn right, move forward 3, turn right, move forward 4.'
   },
   {
     id: 12,
+    name: 'Left Turn Loop',
+    map: [
+      '#########',
+      '#.......#',
+      '#.#####.#',
+      '#.#####.#',
+      '#.G####.#',
+      '#######.#',
+      '#S......#',
+      '#########'
+    ],
+    startDirection: 'east',
+    maxBlocks: 6,
+    intro: 'The path turns left at irregular intervals. Use "if path left" to detect the turns.',
+    toolbox: toolboxSensing,
+    solution: 'Repeat until goal: If path left, turn left. Move forward.'
+  },
+  {
+    id: 13,
     name: 'Decision Alley',
     map: [
       '#########',
@@ -340,10 +366,11 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 11,
     intro: 'Sensors help you ignore the tempting dead end halfway through.',
-    toolbox: toolboxSensing
+    toolbox: toolboxSensing,
+    solution: 'Move forward 4, turn left, move forward, turn left, move forward, turn right, move forward, turn right, move forward 4.'
   },
   {
-    id: 13,
+    id: 14,
     name: 'Side Streets',
     map: [
       '###########',
@@ -359,10 +386,11 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 13,
     intro: 'Navigate side streets; checks keep you from wandering into traps.',
-    toolbox: toolboxSensing
+    toolbox: toolboxSensing,
+    solution: 'Move forward 4, turn left, move forward 3, turn right, move forward 4.'
   },
   {
-    id: 14,
+    id: 15,
     name: 'Weave',
     map: [
       '###########',
@@ -378,29 +406,31 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 14,
     intro: 'Weave through offset alleys using path checks to stay centered.',
-    toolbox: toolboxSensing
-  },
-  {
-    id: 15,
-    name: 'Backtrack Bay',
-    map: [
-      '###########',
-      '###########',
-      '##....G####',
-      '##.########',
-      '##....#####',
-      '####..#####',
-      '###...#####',
-      '#S....#####',
-      '###########'
-    ],
-    startDirection: 'east',
-    maxBlocks: 17,
-    intro: 'Backtrack around the bay without colliding with the seawall.',
-    toolbox: toolboxBranching
+    toolbox: toolboxSensing,
+    solution: 'Move forward 3, turn left, move forward, turn right, move forward 3, turn left, move forward, turn right, move forward 3.'
   },
   {
     id: 16,
+    name: 'Right Turn Box',
+    map: [
+      '#########',
+      '#########',
+      '#.G.....#',
+      '#.#.....#',
+      '#.#.....#',
+      '#.#.....#',
+      '#.#######',
+      '#S......#',
+      '#########'
+    ],
+    startDirection: 'east',
+    maxBlocks: 8,
+    intro: 'Follow the path. If you hit a wall, turn right.',
+    toolbox: toolboxBranching,
+    solution: 'Repeat until goal: If path ahead, move forward. Else, turn right.'
+  },
+  {
+    id: 17,
     name: 'Switchback',
     map: [
       '###########',
@@ -418,10 +448,11 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 20,
     intro: 'Climb the extended switchbacks with careful branching logic.',
-    toolbox: toolboxBranching
+    toolbox: toolboxBranching,
+    solution: 'Move forward 4, turn left, move forward, turn left, move forward 2, turn right, move forward 2, turn left, move forward 2, turn right, move forward 4, turn right, move forward 4.'
   },
   {
-    id: 17,
+    id: 18,
     name: 'Sensor Maze',
     map: [
       '###########',
@@ -439,10 +470,11 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 13,
     intro: 'Use sensors to thread through pockets and avoid looping corridors.',
-    toolbox: toolboxBranching
+    toolbox: toolboxBranching,
+    solution: 'Move forward 4, turn left, move forward 2, turn right, move forward 2, turn left, move forward 2, turn right, move forward 2.'
   },
   {
-    id: 18,
+    id: 19,
     name: 'Barrier Run',
     map: [
       '###########',
@@ -460,10 +492,11 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 14,
     intro: 'Barriers offset in pairs—react to openings as they appear.',
-    toolbox: toolboxAdvanced
+    toolbox: toolboxAdvanced,
+    solution: 'Move forward 2, turn left, move forward 2, turn right, move forward 2, turn left, move forward, turn right, move forward, turn left, move forward 2, turn right, move forward 3.'
   },
   {
-    id: 19,
+    id: 20,
     name: 'Gauntlet',
     map: [
       '#############',
@@ -481,10 +514,11 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 22,
     intro: 'A gauntlet of false turns awaits—branch wisely at every fork.',
-    toolbox: toolboxAdvanced
+    toolbox: toolboxAdvanced,
+    solution: 'Follow the path carefully, using sensors to detect walls and turns.'
   },
   {
-    id: 20,
+    id: 21,
     name: 'Grand Finale',
     map: [
       '#############',
@@ -504,7 +538,8 @@ const rawLevels: MazeLevelDefinition[] = [
     startDirection: 'east',
     maxBlocks: 24,
     intro: 'Bring every technique together to conquer the grand finale.',
-    toolbox: toolboxAdvanced
+    toolbox: toolboxAdvanced,
+    solution: 'Use all your skills! Follow the path, check for walls, and loop until you reach the goal.'
   }
 ];
 

@@ -1,17 +1,28 @@
 import './style.css';
 import * as Blockly from 'blockly';
 import 'blockly/blocks';
-import 'blockly/msg/en';
 import { javascriptGenerator } from 'blockly/javascript';
 import type { WorkspaceSvg } from 'blockly/core';
 
 import { levels } from './mazeLevels';
 import { MazeRuntime } from './mazeRuntime';
 import type { MazeLevel, MazeState } from './mazeTypes';
+import { SoundManager } from './soundManager';
+import { resources } from './i18n';
+import {
+  type BillboardEntry,
+  loadPlayerProfile,
+  savePlayerProfile,
+  loadBillboardEntries,
+  saveBillboardEntries,
+  generateGuestName
+} from './persistence';
 
 const STEP_DELAY_MS = 220;
 const HIGHLIGHT_DELAY_MS = 120;
 const STEP_LIMIT = 2000;
+
+let stepDelay = STEP_DELAY_MS;
 
 type DirectionKeyword = 'AHEAD' | 'LEFT' | 'RIGHT';
 
@@ -25,60 +36,56 @@ interface MazeApi {
   isGoal(): boolean;
 }
 
-interface PlayerProfile {
-  name: string;
-  totalTimeMs: number;
-  totalTrials: number;
-  levelTrials: Record<number, number>;
-}
-
-interface BillboardEntry {
-  id: string;
-  player: string;
-  levelId: number;
-  levelName: string;
-  timeMs: number;
-  recordedAt: number;
-}
-
-const STORAGE_KEYS = {
-  profile: 'blockly-maze.profile.v1',
-  billboard: 'blockly-maze.billboard.v1'
-} as const;
-
 const TOTAL_LEVELS = levels.length;
-const storageAvailable = isLocalStorageAvailable();
 
-let inMemoryProfile: PlayerProfile | null = null;
-let inMemoryBillboard: BillboardEntry[] | null = null;
+const soundManager = new SoundManager();
 
 const appRoot = document.querySelector<HTMLDivElement>('#app');
 if (!appRoot) {
   throw new Error('Unable to locate the #app container.');
 }
 
+// Language handling
+type Language = 'en' | 'zh-Hant';
+const currentLang = (localStorage.getItem('lang') as Language) || 'en';
+const t = resources[currentLang];
+
+// Dynamic import of Blockly locale
+if (currentLang === 'zh-Hant') {
+  await import('blockly/msg/zh-hant');
+} else {
+  await import('blockly/msg/en');
+}
+
 appRoot.innerHTML = `
   <div id="game-view" class="layout">
     <header class="layout__header">
       <div>
-        <h1 class="title">Blockly Maze Clone</h1>
-        <p class="subtitle">Arrange blocks to guide the runner through each maze.</p>
-        <p class="player-label">Playing as <span id="player-name-display" class="player-name"></span></p>
+        <h1 class="title">${t.ui.title}</h1>
+        <p class="subtitle">${t.ui.subtitle}</p>
+        <p class="player-label">${t.ui.playingAs} <span id="player-name-display" class="player-name"></span></p>
       </div>
       <div class="controls">
         <label class="controls__group">
-          <span>Level</span>
+          <span>${t.ui.level}</span>
           <select id="level-select" class="controls__select"></select>
         </label>
         <div class="controls__nav">
-          <button id="prev-button" class="button button--ghost" type="button" aria-label="Previous level">◀ Prev</button>
+          <button id="prev-button" class="button button--ghost" type="button" aria-label="Previous level">${t.ui.prev}</button>
           <span class="controls__progress"><span id="current-level-number"></span>/<span id="total-levels"></span></span>
-          <button id="next-button" class="button button--ghost" type="button" aria-label="Next level">Next ▶</button>
+          <button id="next-button" class="button button--ghost" type="button" aria-label="Next level">${t.ui.next}</button>
         </div>
-        <button id="run-button" class="button button--primary" type="button">Run</button>
-        <button id="reset-button" class="button" type="button">Reset</button>
-        <button id="show-answer-button" class="button button--ghost" type="button">Show Answer</button>
-        <button id="billboard-button" class="button button--ghost" type="button">Billboard</button>
+        <label class="controls__group" title="Adjust execution speed">
+          <span>${t.ui.speed}</span>
+          <input id="speed-slider" type="range" min="50" max="500" step="50" value="220" class="controls__slider" />
+        </label>
+        <button id="run-button" class="button button--primary" type="button">${t.ui.run}</button>
+        <button id="reset-button" class="button" type="button">${t.ui.reset}</button>
+        <button id="show-answer-button" class="button button--ghost" type="button">${t.ui.showAnswer}</button>
+        <button id="show-code-button" class="button button--ghost" type="button">${t.ui.showCode}</button>
+        <button id="billboard-button" class="button button--ghost" type="button">${t.ui.billboard}</button>
+        <button id="sound-button" class="button button--ghost" type="button" aria-label="Toggle sound">🔊</button>
+        <button id="lang-button" class="button button--ghost" type="button">${t.ui.translate}</button>
         <span id="block-counter" class="counter"></span>
       </div>
     </header>
@@ -95,24 +102,24 @@ appRoot.innerHTML = `
         <div id="maze-grid" class="maze-grid"></div>
         <div class="metrics">
           <div class="metric">
-            <span class="metric__label">Current Run</span>
+            <span class="metric__label">${t.ui.metricRun}</span>
             <span id="current-run-timer" class="metric__value">00:00</span>
           </div>
           <div class="metric">
-            <span class="metric__label">Total Time</span>
+            <span class="metric__label">${t.ui.metricTotal}</span>
             <span id="total-time" class="metric__value">00:00</span>
           </div>
           <div class="metric">
-            <span class="metric__label">Trials (Level)</span>
+            <span class="metric__label">${t.ui.metricTrialsLevel}</span>
             <span id="trial-count" class="metric__value">0</span>
           </div>
           <div class="metric">
-            <span class="metric__label">Trials (All)</span>
+            <span class="metric__label">${t.ui.metricTrialsAll}</span>
             <span id="total-trials" class="metric__value">0</span>
           </div>
         </div>
         <div class="maze-panel__footer">
-          <span id="status-text" class="status" data-state="idle">Configure your blocks, then press Run.</span>
+          <span id="status-text" class="status" data-state="idle">${t.ui.statusIdle}</span>
         </div>
       </aside>
     </section>
@@ -120,46 +127,48 @@ appRoot.innerHTML = `
   <section id="billboard-view" class="billboard hidden">
     <header class="billboard__header">
       <div>
-        <h2>Billboard</h2>
-        <p class="billboard__subtitle">Fastest completions across all levels.</p>
+        <h2>${t.ui.billboardTitle}</h2>
+        <p class="billboard__subtitle">${t.ui.billboardSubtitle}</p>
       </div>
       <div class="billboard__actions">
-        <button id="download-csv" class="button" type="button">Download CSV</button>
-        <button id="billboard-back" class="button button--primary" type="button">Back to Maze</button>
+        <button id="download-csv" class="button" type="button">${t.ui.billboardDownload}</button>
+        <button id="billboard-back" class="button button--primary" type="button">${t.ui.billboardBack}</button>
       </div>
     </header>
-    <p class="billboard__player">Signed in as <span id="billboard-player-name" class="player-name"></span></p>
+    <p class="billboard__player">${t.ui.playingAs} <span id="billboard-player-name" class="player-name"></span></p>
     <div class="billboard__table-wrapper">
       <table class="billboard__table">
         <thead>
           <tr>
-            <th>Rank</th>
-            <th>Player</th>
-            <th>Level</th>
-            <th>Time</th>
-            <th>Date</th>
+            <th>${t.ui.billboardRank}</th>
+            <th>${t.ui.billboardPlayer}</th>
+            <th>${t.ui.billboardLevel}</th>
+            <th>${t.ui.billboardTime}</th>
+            <th>${t.ui.billboardDate}</th>
           </tr>
         </thead>
         <tbody id="billboard-body"></tbody>
       </table>
-      <p id="billboard-empty" class="billboard__empty">No runs recorded yet. Finish a maze to appear here.</p>
+      <p id="billboard-empty" class="billboard__empty">${t.ui.billboardEmpty}</p>
     </div>
   </section>
   <div id="player-modal" class="modal hidden">
     <div class="modal__dialog">
-      <h2>Welcome to Blockly Maze</h2>
-      <p>Enter your name to join the billboard, or use the suggested guest name.</p>
+      <h2>${t.ui.modalTitle}</h2>
+      <p>${t.ui.modalText}</p>
       <div class="modal__form">
         <input id="player-name-input" class="modal__input" type="text" maxlength="24" />
-        <button id="player-name-submit" class="button button--primary" type="button">Start Playing</button>
+        <button id="player-name-submit" class="button button--primary" type="button">${t.ui.modalStart}</button>
       </div>
     </div>
   </div>
 `;
 const levelSelect = requireElement<HTMLSelectElement>('#level-select');
+const speedSlider = requireElement<HTMLInputElement>('#speed-slider');
 const runButton = requireElement<HTMLButtonElement>('#run-button');
 const resetButton = requireElement<HTMLButtonElement>('#reset-button');
 const showAnswerButton = requireElement<HTMLButtonElement>('#show-answer-button');
+const showCodeButton = requireElement<HTMLButtonElement>('#show-code-button');
 const statusText = requireElement<HTMLSpanElement>('#status-text');
 const blockCounter = requireElement<HTMLSpanElement>('#block-counter');
 const levelName = requireElement<HTMLHeadingElement>('#level-name');
@@ -177,6 +186,8 @@ const levelTrialCountDisplay = requireElement<HTMLSpanElement>('#trial-count');
 const totalTrialsDisplay = requireElement<HTMLSpanElement>('#total-trials');
 const playerNameDisplay = requireElement<HTMLSpanElement>('#player-name-display');
 const billboardButton = requireElement<HTMLButtonElement>('#billboard-button');
+const soundButton = requireElement<HTMLButtonElement>('#sound-button');
+const langButton = requireElement<HTMLButtonElement>('#lang-button');
 const billboardView = requireElement<HTMLElement>('#billboard-view');
 const gameView = requireElement<HTMLDivElement>('#game-view');
 const billboardBackButton = requireElement<HTMLButtonElement>('#billboard-back');
@@ -258,12 +269,22 @@ runButton.addEventListener('click', () => {
   void runProgram();
 });
 
+speedSlider.addEventListener('input', () => {
+  // Invert the value so higher slider = faster (lower delay)
+  // Slider: 50 (fast) to 500 (slow).
+  // Actually, let's just map directly: Left (50) is fast, Right (500) is slow?
+  // Usually right is "more", so maybe "Speed" means faster?
+  // Let's keep it simple: Slider value is delay in ms.
+  // So Left (50ms) is fast, Right (500ms) is slow.
+  stepDelay = Number(speedSlider.value);
+});
+
 resetButton.addEventListener('click', () => {
   clearWorkspace();
   resetBlockCounter();
   runtime.reset();
   resetRunTimerDisplay();
-  setStatus('idle', 'Workspace cleared. Configure your blocks and try again!');
+  setStatus('idle', t.ui.statusIdle);
 });
 
 levelSelect.addEventListener('change', () => {
@@ -292,8 +313,24 @@ showAnswerButton.addEventListener('click', () => {
   showAnswer();
 });
 
+showCodeButton.addEventListener('click', () => {
+  showCode();
+});
+
 billboardButton.addEventListener('click', () => {
   showBillboard();
+});
+
+soundButton.addEventListener('click', () => {
+  const enabled = !soundManager.isEnabled();
+  soundManager.setEnabled(enabled);
+  soundButton.textContent = enabled ? t.ui.soundOn : t.ui.soundOff;
+});
+
+langButton.addEventListener('click', () => {
+  const nextLang = currentLang === 'en' ? 'zh-Hant' : 'en';
+  localStorage.setItem('lang', nextLang);
+  window.location.reload();
 });
 
 billboardBackButton.addEventListener('click', () => {
@@ -348,7 +385,7 @@ async function runProgram(): Promise<void> {
   prevButton.disabled = true;
   nextButton.disabled = true;
 
-  setStatus('running', 'Executing your program...');
+  setStatus('running', t.ui.statusRunning);
   runtime.reset();
   workspace.highlightBlock(null);
 
@@ -396,21 +433,30 @@ async function runProgram(): Promise<void> {
   }
 
   if (outcome === 'success') {
-    setStatus('success', `Success! Goal reached in ${formatBillboardTime(lastRunDurationMs)}.`);
+    setStatus('success', t.ui.statusSuccess.replace('{time}', formatBillboardTime(lastRunDurationMs)));
     recordBillboardEntry(playerProfile.name, currentLevel, lastRunDurationMs);
+    soundManager.playWin();
   } else if (outcome === 'incomplete') {
-    setStatus('warning', 'Program finished, but the runner did not reach the goal.');
+    setStatus('warning', t.ui.statusIncomplete);
+    soundManager.playFail();
   } else {
-    setStatus('error', errorMessage || 'Something went wrong while running the program.');
+    setStatus('error', errorMessage || t.ui.statusError);
+    soundManager.playFail();
   }
 }
 
 function loadLevel(level: MazeLevel): void {
   currentLevel = level;
   levelSelect.value = String(level.id);
-  levelName.textContent = `${level.id}. ${level.name}`;
-  levelIntro.textContent = level.intro;
-  setStatus('idle', 'Configure your blocks, then press Run.');
+  
+  // Use translated name/intro if available
+  const levelInfo = t.levels[level.id as keyof typeof t.levels];
+  const displayName = levelInfo ? levelInfo.name : level.name;
+  const displayIntro = levelInfo ? levelInfo.intro : level.intro;
+
+  levelName.textContent = `${level.id}. ${displayName}`;
+  levelIntro.textContent = displayIntro;
+  setStatus('idle', t.ui.statusIdle);
   updateLevelProgress();
   resetRunTimerDisplay();
   updateTrialDisplays();
@@ -728,7 +774,7 @@ function incrementTrialCounters(levelId: number): void {
   playerProfile.totalTrials += 1;
   playerProfile.levelTrials[levelId] = (playerProfile.levelTrials[levelId] ?? 0) + 1;
   updateTrialDisplays();
-  savePlayerProfile();
+  savePlayerProfile(playerProfile);
 }
 
 function updateTrialDisplays(): void {
@@ -779,7 +825,7 @@ function recordRunTime(elapsedMs: number): void {
   }
   playerProfile.totalTimeMs += elapsedMs;
   updateTotalTimeDisplay();
-  savePlayerProfile();
+  savePlayerProfile(playerProfile);
 }
 
 function updateTotalTimeDisplay(): void {
@@ -835,11 +881,21 @@ function hideBillboard(): void {
 }
 
 function showAnswer(): void {
-  if (!currentLevel.solution) {
+  const solution = (t.levels as any)[currentLevel.id]?.solution || currentLevel.solution;
+  if (!solution) {
     setStatus('warning', 'No solution hint available for this level.');
     return;
   }
-  setStatus('idle', `💡 Hint: ${currentLevel.solution}`);
+  setStatus('idle', solution);
+}
+
+function showCode(): void {
+  const code = javascriptGenerator.workspaceToCode(workspace);
+  if (!code) {
+    setStatus('warning', 'No code to show. Add some blocks first!');
+    return;
+  }
+  alert(code);
 }
 
 function updateBillboardTable(): void {
@@ -953,7 +1009,7 @@ function downloadBillboardCsv(): void {
 function handlePlayerNameSubmit(): void {
   const proposed = playerNameInput.value.trim() || playerProfile.name || generateGuestName();
   playerProfile.name = proposed;
-  savePlayerProfile();
+  savePlayerProfile(playerProfile);
   updatePlayerDisplays();
   closePlayerModal();
 }
@@ -980,166 +1036,18 @@ function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
 }
 
-function loadPlayerProfile(): { profile: PlayerProfile; needsName: boolean } {
-  if (!storageAvailable) {
-    if (!inMemoryProfile) {
-      inMemoryProfile = createDefaultProfile();
-      return { profile: inMemoryProfile, needsName: true };
-    }
-    const needsName = inMemoryProfile.name.trim().length === 0;
-    return { profile: inMemoryProfile, needsName };
-  }
 
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.profile);
-    if (!raw) {
-      const profile = createDefaultProfile();
-      inMemoryProfile = profile;
-      return { profile, needsName: true };
-    }
-    const parsed = JSON.parse(raw) as Partial<PlayerProfile>;
-    const normalized = normalizeProfile(parsed);
-    inMemoryProfile = normalized;
-    const needsName = normalized.name.trim().length === 0;
-    if (needsName) {
-      const fallback = { ...normalized, name: generateGuestName() };
-      inMemoryProfile = fallback;
-      return { profile: fallback, needsName: true };
-    }
-    return { profile: normalized, needsName };
-  } catch {
-    const profile = createDefaultProfile();
-    inMemoryProfile = profile;
-    return { profile, needsName: true };
-  }
-}
-
-function savePlayerProfile(): void {
-  inMemoryProfile = { ...playerProfile, levelTrials: { ...playerProfile.levelTrials } };
-  if (!storageAvailable) {
-    return;
-  }
-  try {
-    window.localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(inMemoryProfile));
-  } catch {
-    // Ignore storage failures, rely on in-memory backup.
-  }
-}
-
-function loadBillboardEntries(): BillboardEntry[] {
-  if (!storageAvailable) {
-    if (!inMemoryBillboard) {
-      inMemoryBillboard = [];
-    }
-    return inMemoryBillboard;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEYS.billboard);
-    if (!raw) {
-      inMemoryBillboard = [];
-      return [];
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      inMemoryBillboard = [];
-      return [];
-    }
-    const normalized: BillboardEntry[] = parsed
-      .map((entry) => normalizeBillboardEntry(entry))
-      .filter((entry): entry is BillboardEntry => entry !== null);
-    inMemoryBillboard = normalized;
-    return normalized;
-  } catch {
-    inMemoryBillboard = [];
-    return [];
-  }
-}
-
-function saveBillboardEntries(entries: BillboardEntry[]): void {
-  inMemoryBillboard = [...entries];
-  if (!storageAvailable) {
-    return;
-  }
-  try {
-    window.localStorage.setItem(STORAGE_KEYS.billboard, JSON.stringify(entries));
-  } catch {
-    // Ignore storage failures, rely on in-memory backup.
-  }
-}
-
-function createDefaultProfile(): PlayerProfile {
-  return {
-    name: generateGuestName(),
-    totalTimeMs: 0,
-    totalTrials: 0,
-    levelTrials: {}
-  };
-}
-
-function normalizeProfile(raw: Partial<PlayerProfile> | null | undefined): PlayerProfile {
-  const levelTrials: Record<number, number> = {};
-  if (raw?.levelTrials && typeof raw.levelTrials === 'object') {
-    Object.entries(raw.levelTrials).forEach(([key, value]) => {
-      const id = Number(key);
-      const trials = typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
-      if (!Number.isNaN(id)) {
-        levelTrials[id] = trials;
-      }
-    });
-  }
-
-  return {
-    name: typeof raw?.name === 'string' ? raw.name : '',
-    totalTimeMs: typeof raw?.totalTimeMs === 'number' && Number.isFinite(raw.totalTimeMs) ? Math.max(0, raw.totalTimeMs) : 0,
-    totalTrials: typeof raw?.totalTrials === 'number' && Number.isFinite(raw.totalTrials) ? Math.max(0, Math.floor(raw.totalTrials)) : 0,
-    levelTrials
-  };
-}
-
-function normalizeBillboardEntry(raw: unknown): BillboardEntry | null {
-  if (!raw || typeof raw !== 'object') {
-    return null;
-  }
-  const candidate = raw as Partial<BillboardEntry>;
-  const levelId = typeof candidate.levelId === 'number' ? candidate.levelId : Number(candidate.levelId);
-  const timeMs = typeof candidate.timeMs === 'number' ? candidate.timeMs : Number(candidate.timeMs);
-  const recordedAt = typeof candidate.recordedAt === 'number' ? candidate.recordedAt : Number(candidate.recordedAt);
-  if (!Number.isFinite(levelId) || !Number.isFinite(timeMs) || timeMs <= 0 || !Number.isFinite(recordedAt)) {
-    return null;
-  }
-  return {
-    id: typeof candidate.id === 'string' && candidate.id.length > 0 ? candidate.id : `${recordedAt}-${Math.random().toString(16).slice(2)}`,
-    player: typeof candidate.player === 'string' && candidate.player.length > 0 ? candidate.player : 'Unknown',
-    levelId: Math.max(1, Math.round(levelId)),
-    levelName: typeof candidate.levelName === 'string' ? candidate.levelName : `Level ${Math.max(1, Math.round(levelId))}`,
-    timeMs,
-    recordedAt
-  };
-}
-
-function generateGuestName(): string {
-  const suffix = String(Math.floor(Math.random() * 900) + 100);
-  return `Guest ${suffix}`;
-}
-
-function isLocalStorageAvailable(): boolean {
-  try {
-    const key = '__maze_game_test__';
-    window.localStorage.setItem(key, '1');
-    window.localStorage.removeItem(key);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function populateLevelSelect(select: HTMLSelectElement, entries: MazeLevel[]): void {
   select.innerHTML = '';
   entries.forEach((entry) => {
     const option = document.createElement('option');
     option.value = String(entry.id);
-    option.textContent = `${entry.id}. ${entry.name}`;
+    
+    const levelInfo = t.levels[entry.id as keyof typeof t.levels];
+    const displayName = levelInfo ? levelInfo.name : entry.name;
+    
+    option.textContent = `${entry.id}. ${displayName}`;
     if (entry.id === entries[0]?.id) {
       option.selected = true;
     }
@@ -1172,35 +1080,35 @@ function defineMazeBlocks(): void {
   Blockly.common.defineBlocksWithJsonArray([
     {
       type: 'maze_move_forward',
-      message0: 'move forward',
+      message0: t.blocks.moveForward,
       previousStatement: null,
       nextStatement: null,
-      colour: 200,
+      colour: 160,
       tooltip: 'Move the runner forward one tile.',
       helpUrl: ''
     },
     {
       type: 'maze_turn_left',
-      message0: 'turn left',
+      message0: t.blocks.turnLeft,
       previousStatement: null,
       nextStatement: null,
-      colour: 200,
+      colour: 180,
       tooltip: 'Rotate the runner left.',
       helpUrl: ''
     },
     {
       type: 'maze_turn_right',
-      message0: 'turn right',
+      message0: t.blocks.turnRight,
       previousStatement: null,
       nextStatement: null,
-      colour: 200,
+      colour: 180,
       tooltip: 'Rotate the runner right.',
       helpUrl: ''
     },
     {
       type: 'maze_repeat_until_goal',
-      message0: 'repeat until goal',
-      message1: 'do %1',
+      message0: t.blocks.repeatUntil,
+      message1: t.blocks.do,
       args1: [
         {
           type: 'input_statement',
@@ -1215,19 +1123,19 @@ function defineMazeBlocks(): void {
     },
     {
       type: 'maze_if_path',
-      message0: 'if path %1',
+      message0: t.blocks.ifPath,
       args0: [
         {
           type: 'field_dropdown',
           name: 'DIR',
           options: [
-            ['ahead', 'AHEAD'],
-            ['left', 'LEFT'],
-            ['right', 'RIGHT']
+            [t.blocks.dirAhead, 'AHEAD'],
+            [t.blocks.dirLeft, 'LEFT'],
+            [t.blocks.dirRight, 'RIGHT']
           ]
         }
       ],
-      message1: 'do %1',
+      message1: t.blocks.do,
       args1: [
         {
           type: 'input_statement',
@@ -1236,32 +1144,32 @@ function defineMazeBlocks(): void {
       ],
       previousStatement: null,
       nextStatement: null,
-      colour: 20,
+      colour: 210,
       tooltip: 'Run the enclosed actions when there is an open path in the selected direction.',
       helpUrl: ''
     },
     {
       type: 'maze_if_else_path',
-      message0: 'if path %1',
+      message0: t.blocks.ifPath,
       args0: [
         {
           type: 'field_dropdown',
           name: 'DIR',
           options: [
-            ['ahead', 'AHEAD'],
-            ['left', 'LEFT'],
-            ['right', 'RIGHT']
+            [t.blocks.dirAhead, 'AHEAD'],
+            [t.blocks.dirLeft, 'LEFT'],
+            [t.blocks.dirRight, 'RIGHT']
           ]
         }
       ],
-      message1: 'do %1',
+      message1: t.blocks.do,
       args1: [
         {
           type: 'input_statement',
           name: 'DO'
         }
       ],
-      message2: 'else %1',
+      message2: t.blocks.else,
       args2: [
         {
           type: 'input_statement',
@@ -1270,7 +1178,7 @@ function defineMazeBlocks(): void {
       ],
       previousStatement: null,
       nextStatement: null,
-      colour: 20,
+      colour: 210,
       tooltip: 'Split execution based on whether a path exists in the selected direction.',
       helpUrl: ''
     }
@@ -1321,16 +1229,24 @@ function createMazeApi(runtimeInstance: MazeRuntime, workspaceInstance: Workspac
       }
     },
     async moveForward() {
-      runtimeInstance.moveForward();
-      await delay(STEP_DELAY_MS);
+      try {
+        runtimeInstance.moveForward();
+        soundManager.playMove();
+        await delay(stepDelay);
+      } catch (e) {
+        soundManager.playWallHit();
+        throw e;
+      }
     },
     async turnLeft() {
       runtimeInstance.turnLeft();
-      await delay(HIGHLIGHT_DELAY_MS);
+      soundManager.playTurn();
+      await delay(Math.min(HIGHLIGHT_DELAY_MS, stepDelay));
     },
     async turnRight() {
       runtimeInstance.turnRight();
-      await delay(HIGHLIGHT_DELAY_MS);
+      soundManager.playTurn();
+      await delay(Math.min(HIGHLIGHT_DELAY_MS, stepDelay));
     },
     isPath(direction: DirectionKeyword) {
       switch (direction) {
