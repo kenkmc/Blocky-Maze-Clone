@@ -1,4 +1,4 @@
-import type { MazeLevel, MazeLevelDefinition, MazeTile } from './mazeTypes';
+import type { MazeConcept, MazeHeading, MazeLevel, MazeLevelDefinition, MazePosition, MazeTile } from './mazeTypes';
 
 const toolboxForward = {
   kind: 'flyoutToolbox',
@@ -67,9 +67,7 @@ const toolboxSensing = {
           }
         }
       }
-    },
-    { kind: 'sep' },
-    { kind: 'block', type: 'maze_if_path' }
+    }
   ]
 } satisfies import('blockly/core').utils.toolbox.ToolboxDefinition;
 
@@ -92,10 +90,7 @@ const toolboxBranching = {
           }
         }
       }
-    },
-    { kind: 'sep' },
-    { kind: 'block', type: 'maze_if_path' },
-    { kind: 'block', type: 'maze_if_else_path' }
+    }
   ]
 } satisfies import('blockly/core').utils.toolbox.ToolboxDefinition;
 
@@ -119,8 +114,6 @@ const toolboxAdvanced = {
         }
       }
     },
-    { kind: 'block', type: 'maze_if_path' },
-    { kind: 'block', type: 'maze_if_else_path' },
     { kind: 'sep' },
     { kind: 'block', type: 'logic_compare' },
     { kind: 'block', type: 'logic_operation' },
@@ -128,6 +121,69 @@ const toolboxAdvanced = {
     { kind: 'block', type: 'math_number' }
   ]
 } satisfies import('blockly/core').utils.toolbox.ToolboxDefinition;
+
+const toolboxVariables = {
+  kind: 'flyoutToolbox',
+  contents: [
+    { kind: 'block', type: 'maze_move_forward' },
+    { kind: 'block', type: 'maze_turn_left' },
+    { kind: 'block', type: 'maze_turn_right' },
+    { kind: 'sep' },
+    {
+      kind: 'block',
+      type: 'variables_set',
+      fields: {
+        VAR: 'steps'
+      },
+      inputs: {
+        VALUE: {
+          block: {
+            type: 'math_number',
+            fields: { NUM: 4 }
+          }
+        }
+      }
+    },
+    { kind: 'block', type: 'variables_get', fields: { VAR: 'steps' } },
+    { kind: 'block', type: 'math_arithmetic' },
+    { kind: 'block', type: 'math_number' },
+    { kind: 'block', type: 'logic_compare' },
+    { kind: 'block', type: 'controls_whileUntil' },
+    { kind: 'sep' },
+    { kind: 'block', type: 'maze_repeat_until_goal' }
+  ]
+} satisfies import('blockly/core').utils.toolbox.ToolboxDefinition;
+
+type ReferenceStep =
+  | { kind: 'forward'; count?: number }
+  | { kind: 'left'; count?: number }
+  | { kind: 'right'; count?: number }
+  | { kind: 'repeat'; times: number; steps: ReferenceStep[] }
+  | { kind: 'repeatUntilGoal'; steps: ReferenceStep[]; maxIterations?: number }
+  | { kind: 'setVar'; name: string; value: number }
+  | { kind: 'addVar'; name: string; delta: number }
+  | { kind: 'whileVarPositive'; name: string; steps: ReferenceStep[]; maxIterations?: number };
+
+interface CurriculumEntry {
+  learningFocus: string;
+  requiredConcepts: MazeConcept[];
+  answer: string;
+  referenceProgram: ReferenceStep[];
+  toolbox?: import('blockly/core').utils.toolbox.ToolboxDefinition;
+}
+
+const forward = (count = 1): ReferenceStep => ({ kind: 'forward', count });
+const left = (count = 1): ReferenceStep => ({ kind: 'left', count });
+const right = (count = 1): ReferenceStep => ({ kind: 'right', count });
+const repeat = (times: number, steps: ReferenceStep[]): ReferenceStep => ({ kind: 'repeat', times, steps });
+const setVar = (name: string, value: number): ReferenceStep => ({ kind: 'setVar', name, value });
+const addVar = (name: string, delta: number): ReferenceStep => ({ kind: 'addVar', name, delta });
+const whileVarPositive = (name: string, steps: ReferenceStep[], maxIterations = 200): ReferenceStep => ({
+  kind: 'whileVarPositive',
+  name,
+  steps,
+  maxIterations
+});
 
 const rawLevels: MazeLevelDefinition[] = [
   {
@@ -336,10 +392,10 @@ const rawLevels: MazeLevelDefinition[] = [
     map: [
       '#########',
       '#.......#',
-      '#.#####.#',
+      '#.##.##.#',
       '#.#####.#',
       '#.G####.#',
-      '#######.#',
+      '###.###.#',
       '#S......#',
       '#########'
     ],
@@ -357,9 +413,9 @@ const rawLevels: MazeLevelDefinition[] = [
       '#########',
       '#########',
       '#########',
-      '#####...G',
-      '####...##',
-      '#####..##',
+      '#####G###',
+      '###.#.###',
+      '###.#.###',
       '#S....###',
       '#########'
     ],
@@ -373,15 +429,15 @@ const rawLevels: MazeLevelDefinition[] = [
     id: 14,
     name: 'Side Streets',
     map: [
-      '###########',
-      '###########',
-      '###########',
-      '#####....G#',
-      '#####.#####',
-      '#####.#####',
-      '##..#.#...#',
-      '#S....#####',
-      '###########'
+      '#########',
+      '#########',
+      '#########',
+      '#########',
+      '##G...###',
+      '#####..##',
+      '####..###',
+      '#S....###',
+      '#########'
     ],
     startDirection: 'east',
     maxBlocks: 13,
@@ -393,15 +449,15 @@ const rawLevels: MazeLevelDefinition[] = [
     id: 15,
     name: 'Weave',
     map: [
-      '###########',
-      '###########',
-      '###########',
-      '#######...G',
-      '#####...###',
-      '####....###',
-      '####.######',
-      '#S...######',
-      '###########'
+      '#########',
+      '#########',
+      '#########',
+      '#########',
+      '#.....###',
+      '#.###.###',
+      '#G###.###',
+      '#S....###',
+      '#########'
     ],
     startDirection: 'east',
     maxBlocks: 14,
@@ -415,12 +471,13 @@ const rawLevels: MazeLevelDefinition[] = [
     map: [
       '#########',
       '#########',
-      '#.G.....#',
-      '#.#.....#',
-      '#.#.....#',
-      '#.#.....#',
-      '#.#######',
-      '#S......#',
+      '#.....G##',
+      '#.#####.#',
+      '#.#...#.#',
+      '#.#.#.#.#',
+      '#...#.#.#',
+      '###.#.#.#',
+      '#S..#...#',
       '#########'
     ],
     startDirection: 'east',
@@ -433,17 +490,16 @@ const rawLevels: MazeLevelDefinition[] = [
     id: 17,
     name: 'Switchback',
     map: [
-      '###########',
-      '###########',
-      '#....G#####',
-      '#.#########',
-      '#.#########',
-      '#...#######',
-      '###.#######',
-      '###...#####',
-      '#####.#####',
-      '#S....#####',
-      '###########'
+      '##########',
+      '#......G##',
+      '#.######.#',
+      '#.#....#.#',
+      '#.#.##.#.#',
+      '#...##.#.#',
+      '###.##.#.#',
+      '#...##...#',
+      '#S.#######',
+      '##########'
     ],
     startDirection: 'east',
     maxBlocks: 20,
@@ -456,15 +512,15 @@ const rawLevels: MazeLevelDefinition[] = [
     name: 'Sensor Maze',
     map: [
       '###########',
-      '###########',
-      '###########',
-      '###########',
-      '###########',
-      '#####....G#',
-      '#####..####',
-      '###...#.###',
-      '###.#.#.###',
-      '#S....#####',
+      '#.......G##',
+      '#.#######.#',
+      '#.#.....#.#',
+      '#.#.###.#.#',
+      '#...#.#.#.#',
+      '###.#.#.#.#',
+      '#...#...#.#',
+      '#.#####.#.#',
+      '#S......#.#',
       '###########'
     ],
     startDirection: 'east',
@@ -477,17 +533,18 @@ const rawLevels: MazeLevelDefinition[] = [
     id: 19,
     name: 'Barrier Run',
     map: [
-      '###########',
-      '###########',
-      '###########',
-      '###########',
-      '#####....G#',
-      '#####..####',
-      '####..#####',
-      '##....#####',
-      '##..#######',
-      '#S..#######',
-      '###########'
+      '############',
+      '#........G##',
+      '#.########.#',
+      '#.#......#.#',
+      '#.#.####.#.#',
+      '#...#..#.#.#',
+      '###.#.##.#.#',
+      '#...#....#.#',
+      '#.######.#.#',
+      '#......#.#.#',
+      '#S####...#.#',
+      '############'
     ],
     startDirection: 'east',
     maxBlocks: 14,
@@ -500,15 +557,17 @@ const rawLevels: MazeLevelDefinition[] = [
     name: 'Gauntlet',
     map: [
       '#############',
-      '##.....G#####',
-      '##.##########',
-      '##.######.###',
-      '##.#####..###',
-      '##....#..####',
-      '#####...#####',
-      '####...######',
-      '####..#######',
-      '#S....#######',
+      '#.........G##',
+      '#.#########.#',
+      '#.#.......#.#',
+      '#.#.#####.#.#',
+      '#...#...#.#.#',
+      '###.#.#.#.#.#',
+      '#...#.#...#.#',
+      '#.###.#####.#',
+      '#.#...#.....#',
+      '#.#.###.###.#',
+      '#S..#...#...#',
       '#############'
     ],
     startDirection: 'east',
@@ -522,17 +581,17 @@ const rawLevels: MazeLevelDefinition[] = [
     name: 'Grand Finale',
     map: [
       '#############',
-      '#############',
-      '#############',
-      '########..###',
-      '#......G.####',
-      '#.####..#####',
-      '#.###..######',
-      '#.....#######',
-      '##...########',
-      '##....#######',
-      '##.##.#######',
-      '#S....#######',
+      '#.......G...#',
+      '#.#####.###.#',
+      '#.#...#...#.#',
+      '#.#.#.###.#.#',
+      '#...#...#.#.#',
+      '###.###.#.#.#',
+      '#...#...#...#',
+      '#.###.#####.#',
+      '#.#...#...#.#',
+      '#.#.###.#.#.#',
+      '#S..#...#...#',
       '#############'
     ],
     startDirection: 'east',
@@ -542,6 +601,408 @@ const rawLevels: MazeLevelDefinition[] = [
     solution: 'Use all your skills! Follow the path, check for walls, and loop until you reach the goal.'
   }
 ];
+
+const curriculumPlan: Record<number, CurriculumEntry> = {
+  1: {
+    learningFocus: '順序：建立前進步數概念',
+    requiredConcepts: ['sequence'],
+    answer: '向前移動 4 次。',
+    referenceProgram: [forward(4)],
+    toolbox: toolboxForward
+  },
+  2: {
+    learningFocus: '順序：右轉後再直行',
+    requiredConcepts: ['sequence'],
+    answer: '右轉，向前 2 次，左轉，向前 4 次。',
+    referenceProgram: [right(), forward(2), left(), forward(4)],
+    toolbox: toolboxTurns
+  },
+  3: {
+    learningFocus: '順序：路徑分段與方位轉換',
+    requiredConcepts: ['sequence'],
+    answer: '向前 2 次，左轉，向前 3 次，右轉，向前 2 次。',
+    referenceProgram: [forward(2), left(), forward(3), right(), forward(2)],
+    toolbox: toolboxTurns
+  },
+  4: {
+    learningFocus: '順序：左右交錯控制',
+    requiredConcepts: ['sequence'],
+    answer: '向前 2 次，左轉，向前 2 次，右轉，向前 2 次，左轉，向前 2 次。',
+    referenceProgram: [forward(2), left(), forward(2), right(), forward(2), left(), forward(2)],
+    toolbox: toolboxTurns
+  },
+  5: {
+    learningFocus: '順序：起始朝向與轉身',
+    requiredConcepts: ['sequence'],
+    answer: '向前 2 次，右轉，向前 3 次，右轉，向前 2 次。',
+    referenceProgram: [forward(2), right(), forward(3), right(), forward(2)],
+    toolbox: toolboxTurns
+  },
+  6: {
+    learningFocus: '循環：固定次數重複（repeat）',
+    requiredConcepts: ['loop'],
+    answer: '右轉後重複 4 次向前移動。',
+    referenceProgram: [right(), repeat(4, [forward()])],
+    toolbox: toolboxRepeat
+  },
+  7: {
+    learningFocus: '循環：抽取階梯的重複樣式',
+    requiredConcepts: ['loop'],
+    answer: '先向前 2 次，再重複 3 次「左轉、前進、右轉、前進」，最後前進 1 次。',
+    referenceProgram: [forward(2), repeat(3, [left(), forward(), right(), forward()]), forward()],
+    toolbox: toolboxRepeat
+  },
+  8: {
+    learningFocus: '循環：計數迴圈控制段落',
+    requiredConcepts: ['loop'],
+    answer: '重複 3 次：向前 2、右轉、向前 2、左轉。',
+    referenceProgram: [repeat(3, [forward(2), right(), forward(2), left()])],
+    toolbox: toolboxCountLoops
+  },
+  9: {
+    learningFocus: '循環：以最小步驟表達重複',
+    requiredConcepts: ['loop'],
+    answer: '重複 4 次向前移動。',
+    referenceProgram: [repeat(4, [forward()])],
+    toolbox: toolboxCountLoops
+  },
+  10: {
+    learningFocus: '變量＋循環：用計步器驅動移動',
+    requiredConcepts: ['variable', 'loop'],
+    answer: '設定 steps=5，當 steps>0 時前進並遞減；左轉後設定 steps=6，再重複。',
+    referenceProgram: [
+      setVar('steps', 5),
+      whileVarPositive('steps', [forward(), addVar('steps', -1)]),
+      left(),
+      setVar('steps', 6),
+      whileVarPositive('steps', [forward(), addVar('steps', -1)])
+    ],
+    toolbox: toolboxVariables
+  },
+  11: {
+    learningFocus: '變量：多段路徑的分段計數',
+    requiredConcepts: ['variable', 'loop'],
+    answer: '以 segment 變量依序控制 3、3、3、3、4 步，並在段落間轉向。',
+    referenceProgram: [
+      setVar('segment', 3),
+      whileVarPositive('segment', [forward(), addVar('segment', -1)]),
+      left(),
+      setVar('segment', 3),
+      whileVarPositive('segment', [forward(), addVar('segment', -1)]),
+      left(),
+      setVar('segment', 3),
+      whileVarPositive('segment', [forward(), addVar('segment', -1)]),
+      right(),
+      setVar('segment', 3),
+      whileVarPositive('segment', [forward(), addVar('segment', -1)]),
+      right(),
+      setVar('segment', 4),
+      whileVarPositive('segment', [forward(), addVar('segment', -1)])
+    ],
+    toolbox: toolboxVariables
+  },
+  12: {
+    learningFocus: '路徑規劃：長路徑分段執行',
+    requiredConcepts: ['sequence', 'loop'],
+    answer: '重複 2 次：前進 6、左轉；再前進 5、左轉、前進 6、左轉、前進 3、左轉、前進 1。',
+    referenceProgram: [repeat(2, [forward(6), left()]), forward(5), left(), forward(6), left(), forward(3), left(), forward(1)],
+    toolbox: toolboxSensing
+  },
+  13: {
+    learningFocus: '路徑規劃：L 型路徑拆解',
+    requiredConcepts: ['sequence'],
+    answer: '前進 4、左轉、前進 3。',
+    referenceProgram: [forward(4), left(), forward(3)],
+    toolbox: toolboxSensing
+  },
+  14: {
+    learningFocus: '路徑規劃：雙轉折路線',
+    requiredConcepts: ['sequence'],
+    answer: '前進 4、左轉、前進 3、左轉、前進 3。',
+    referenceProgram: [forward(4), left(), forward(3), left(), forward(3)],
+    toolbox: toolboxSensing
+  },
+  15: {
+    learningFocus: '路徑規劃：起始朝向修正',
+    requiredConcepts: ['sequence'],
+    answer: '左轉，前進 1。',
+    referenceProgram: [left(), forward(1)],
+    toolbox: toolboxSensing
+  },
+  16: {
+    learningFocus: '循環：重複轉角樣式',
+    requiredConcepts: ['sequence', 'loop'],
+    answer: '前進 2，重複 2 次（左轉、前進 2），再右轉、前進 4、右轉、前進 5。',
+    referenceProgram: [forward(2), repeat(2, [left(), forward(2)]), right(), forward(4), right(), forward(5)],
+    toolbox: toolboxBranching
+  },
+  17: {
+    learningFocus: '循環：折返路徑的規律重複',
+    requiredConcepts: ['sequence', 'loop'],
+    answer: '左轉、前進 1、右轉，重複 2 次（前進 2、左轉），再前進 2、右轉、前進 4、右轉、前進 6。',
+    referenceProgram: [left(), forward(1), right(), repeat(2, [forward(2), left()]), forward(2), right(), forward(4), right(), forward(6)],
+    toolbox: toolboxBranching
+  },
+  18: {
+    learningFocus: '循環：長迷宮分段策略',
+    requiredConcepts: ['sequence', 'loop'],
+    answer: '左轉、前進 2、右轉，重複 2 次（前進 2、左轉），再前進 2、右轉、前進 4、右轉、前進 7。',
+    referenceProgram: [left(), forward(2), right(), repeat(2, [forward(2), left()]), forward(2), right(), forward(4), right(), forward(7)],
+    toolbox: toolboxBranching
+  },
+  19: {
+    learningFocus: '循環：障礙區段固定樣式',
+    requiredConcepts: ['sequence', 'loop'],
+    answer: '左轉、前進 3、右轉，重複 2 次（前進 2、左轉），再前進 2、右轉、前進 4、右轉、前進 8。',
+    referenceProgram: [left(), forward(3), right(), repeat(2, [forward(2), left()]), forward(2), right(), forward(4), right(), forward(8)],
+    toolbox: toolboxAdvanced
+  },
+  20: {
+    learningFocus: '綜合：高密度路徑分段與重複',
+    requiredConcepts: ['sequence', 'loop'],
+    answer: '左轉、前進 4、右轉，重複 2 次（前進 2、左轉），再前進 2、右轉、前進 4、右轉、前進 9。',
+    referenceProgram: [left(), forward(4), right(), repeat(2, [forward(2), left()]), forward(2), right(), forward(4), right(), forward(9)],
+    toolbox: toolboxAdvanced
+  },
+  21: {
+    learningFocus: '總整：變量控制長路徑執行',
+    requiredConcepts: ['variable', 'loop', 'sequence'],
+    answer: '設定 steps=7，先完成前段轉折，再用變量迴圈前進 7 步到終點。',
+    referenceProgram: [
+      left(),
+      forward(4),
+      right(),
+      repeat(2, [forward(2), left()]),
+      forward(2),
+      right(),
+      forward(4),
+      right(),
+      setVar('steps', 7),
+      whileVarPositive('steps', [forward(), addVar('steps', -1)])
+    ],
+    toolbox: toolboxVariables
+  }
+};
+
+interface ReferenceRuntimeState {
+  row: number;
+  col: number;
+  heading: MazeHeading;
+  goalReached: boolean;
+  variables: Record<string, number>;
+}
+
+const headingOrder: MazeHeading[] = ['north', 'east', 'south', 'west'];
+
+const headingVectors: Record<MazeHeading, { row: number; col: number }> = {
+  north: { row: -1, col: 0 },
+  east: { row: 0, col: 1 },
+  south: { row: 1, col: 0 },
+  west: { row: 0, col: -1 }
+};
+
+function verifyCurriculum(level: MazeLevel, entry: CurriculumEntry): void {
+  const runtimeState: ReferenceRuntimeState = {
+    row: level.start.row,
+    col: level.start.col,
+    heading: level.startHeading,
+    goalReached: false,
+    variables: {}
+  };
+
+  executeReferenceSteps(level, runtimeState, entry.referenceProgram);
+
+  if (!runtimeState.goalReached) {
+    throw new Error(`Level ${level.id} reference answer did not reach the goal.`);
+  }
+
+  const usedConcepts = collectConcepts(entry.referenceProgram);
+  for (const concept of entry.requiredConcepts) {
+    if (!usedConcepts.has(concept)) {
+      throw new Error(`Level ${level.id} reference answer is missing required concept: ${concept}.`);
+    }
+  }
+}
+
+function collectConcepts(steps: ReferenceStep[]): Set<MazeConcept> {
+  const concepts = new Set<MazeConcept>(['sequence']);
+
+  const walk = (list: ReferenceStep[]) => {
+    for (const step of list) {
+      if (step.kind === 'repeat' || step.kind === 'repeatUntilGoal' || step.kind === 'whileVarPositive') {
+        concepts.add('loop');
+      }
+      if (step.kind === 'setVar' || step.kind === 'addVar' || step.kind === 'whileVarPositive') {
+        concepts.add('variable');
+      }
+
+      if (step.kind === 'repeat' || step.kind === 'repeatUntilGoal' || step.kind === 'whileVarPositive') {
+        walk(step.steps);
+      }
+    }
+  };
+
+  walk(steps);
+  return concepts;
+}
+
+function executeReferenceSteps(level: MazeLevel, state: ReferenceRuntimeState, steps: ReferenceStep[]): void {
+  for (const step of steps) {
+    if (state.goalReached) {
+      return;
+    }
+
+    if (step.kind === 'forward') {
+      const count = Math.max(1, Math.floor(step.count ?? 1));
+      for (let index = 0; index < count; index += 1) {
+        moveForward(level, state);
+      }
+      continue;
+    }
+
+    if (step.kind === 'left' || step.kind === 'right') {
+      const count = Math.max(1, Math.floor(step.count ?? 1));
+      for (let index = 0; index < count; index += 1) {
+        rotate(state, step.kind);
+      }
+      continue;
+    }
+
+    if (step.kind === 'repeat') {
+      const times = Math.max(0, Math.floor(step.times));
+      for (let index = 0; index < times; index += 1) {
+        executeReferenceSteps(level, state, step.steps);
+      }
+      continue;
+    }
+
+    if (step.kind === 'repeatUntilGoal') {
+      const maxIterations = Math.max(1, Math.floor(step.maxIterations ?? 200));
+      let iterations = 0;
+      while (!state.goalReached && iterations < maxIterations) {
+        executeReferenceSteps(level, state, step.steps);
+        iterations += 1;
+      }
+      if (!state.goalReached) {
+        throw new Error(`Level ${level.id} reference loop exceeded max iterations (${maxIterations}).`);
+      }
+      continue;
+    }
+
+    if (step.kind === 'setVar') {
+      state.variables[step.name] = step.value;
+      continue;
+    }
+
+    if (step.kind === 'addVar') {
+      const current = state.variables[step.name] ?? 0;
+      state.variables[step.name] = current + step.delta;
+      continue;
+    }
+
+    const maxIterations = Math.max(1, Math.floor(step.maxIterations ?? 200));
+    let iterations = 0;
+    while ((state.variables[step.name] ?? 0) > 0 && iterations < maxIterations && !state.goalReached) {
+      executeReferenceSteps(level, state, step.steps);
+      iterations += 1;
+    }
+    if ((state.variables[step.name] ?? 0) > 0 && !state.goalReached) {
+      throw new Error(`Level ${level.id} reference variable loop exceeded max iterations (${maxIterations}).`);
+    }
+  }
+}
+
+function rotate(state: ReferenceRuntimeState, direction: 'left' | 'right'): void {
+  const currentIndex = headingOrder.indexOf(state.heading);
+  const delta = direction === 'left' ? -1 : 1;
+  const nextIndex = (currentIndex + delta + headingOrder.length) % headingOrder.length;
+  state.heading = headingOrder[nextIndex];
+}
+
+function nextPosition(state: Pick<ReferenceRuntimeState, 'row' | 'col'>, heading: MazeHeading): MazePosition {
+  const vector = headingVectors[heading];
+  return {
+    row: state.row + vector.row,
+    col: state.col + vector.col
+  };
+}
+
+function moveForward(level: MazeLevel, state: ReferenceRuntimeState): void {
+  const next = nextPosition(state, state.heading);
+  const tile = tileAt(level.tiles, next.row, next.col);
+  if (tile === 'wall') {
+    throw new Error(`Reference answer hit a wall at (${next.row}, ${next.col}).`);
+  }
+  state.row = next.row;
+  state.col = next.col;
+  state.goalReached = tile === 'goal';
+}
+
+function tileAt(tiles: MazeTile[][], row: number, col: number): MazeTile {
+  if (row < 0 || col < 0 || row >= tiles.length || col >= tiles[0].length) {
+    return 'wall';
+  }
+  return tiles[row][col];
+}
+
+function formatReferenceProgram(steps: ReferenceStep[], indentLevel = 0): string {
+  const indent = '  '.repeat(indentLevel);
+  const lines: string[] = [];
+
+  for (const step of steps) {
+    if (step.kind === 'forward') {
+      const count = Math.max(1, Math.floor(step.count ?? 1));
+      lines.push(`${indent}moveForward(${count});`);
+      continue;
+    }
+
+    if (step.kind === 'left') {
+      const count = Math.max(1, Math.floor(step.count ?? 1));
+      lines.push(`${indent}turnLeft(${count});`);
+      continue;
+    }
+
+    if (step.kind === 'right') {
+      const count = Math.max(1, Math.floor(step.count ?? 1));
+      lines.push(`${indent}turnRight(${count});`);
+      continue;
+    }
+
+    if (step.kind === 'repeat') {
+      lines.push(`${indent}repeat (${Math.max(0, Math.floor(step.times))}) {`);
+      lines.push(formatReferenceProgram(step.steps, indentLevel + 1));
+      lines.push(`${indent}}`);
+      continue;
+    }
+
+    if (step.kind === 'repeatUntilGoal') {
+      lines.push(`${indent}repeatUntilGoal {`);
+      lines.push(formatReferenceProgram(step.steps, indentLevel + 1));
+      lines.push(`${indent}}`);
+      continue;
+    }
+
+    if (step.kind === 'setVar') {
+      lines.push(`${indent}${step.name} = ${step.value};`);
+      continue;
+    }
+
+    if (step.kind === 'addVar') {
+      if (step.delta >= 0) {
+        lines.push(`${indent}${step.name} += ${step.delta};`);
+      } else {
+        lines.push(`${indent}${step.name} -= ${Math.abs(step.delta)};`);
+      }
+      continue;
+    }
+
+    lines.push(`${indent}while (${step.name} > 0) {`);
+    lines.push(formatReferenceProgram(step.steps, indentLevel + 1));
+    lines.push(`${indent}}`);
+  }
+
+  return lines.join('\n');
+}
 
 function parseLevel(definition: MazeLevelDefinition): MazeLevel {
   if (definition.map.length === 0) {
@@ -591,7 +1052,12 @@ function parseLevel(definition: MazeLevelDefinition): MazeLevel {
     throw new Error(`Level ${definition.id} is missing a goal tile.`);
   }
 
-  return {
+  const curriculumEntry = curriculumPlan[definition.id];
+  if (!curriculumEntry) {
+    throw new Error(`Level ${definition.id} is missing curriculum metadata.`);
+  }
+
+  const level: MazeLevel = {
     id: definition.id,
     name: definition.name,
     tiles,
@@ -600,12 +1066,28 @@ function parseLevel(definition: MazeLevelDefinition): MazeLevel {
     startHeading: definition.startDirection,
     maxBlocks: definition.maxBlocks,
     intro: definition.intro,
-    toolbox: definition.toolbox,
-    solution: definition.solution
+    learningFocus: curriculumEntry.learningFocus,
+    requiredConcepts: [...curriculumEntry.requiredConcepts],
+    toolbox: curriculumEntry.toolbox ?? definition.toolbox,
+    solution: formatReferenceProgram(curriculumEntry.referenceProgram)
   };
+
+  verifyCurriculum(level, curriculumEntry);
+  return level;
 }
 
-export const levels: MazeLevel[] = rawLevels.map(parseLevel);
+export const levels: MazeLevel[] = rawLevels.flatMap((definition) => {
+  try {
+    return [parseLevel(definition)];
+  } catch (error) {
+    console.error(`Skipping invalid level ${definition.id}.`, error);
+    return [];
+  }
+});
+
+if (levels.length === 0) {
+  throw new Error('No valid maze levels are available.');
+}
 
 export function getLevelById(id: number): MazeLevel {
   const level = levels.find((entry) => entry.id === id);

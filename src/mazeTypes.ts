@@ -2,6 +2,8 @@ export type MazeHeading = 'north' | 'east' | 'south' | 'west';
 
 export type MazeTile = 'wall' | 'open' | 'goal';
 
+export type MazeConcept = 'sequence' | 'loop' | 'selection' | 'variable';
+
 export interface MazePosition {
   row: number;
   col: number;
@@ -14,6 +16,8 @@ export interface MazeLevelDefinition {
   startDirection: MazeHeading;
   maxBlocks: number;
   intro: string;
+  learningFocus?: string;
+  requiredConcepts?: MazeConcept[];
   toolbox?: import('blockly/core').utils.toolbox.ToolboxDefinition;
   solution?: string;
 }
@@ -27,6 +31,8 @@ export interface MazeLevel {
   startHeading: MazeHeading;
   maxBlocks: number;
   intro: string;
+  learningFocus: string;
+  requiredConcepts: MazeConcept[];
   toolbox?: import('blockly/core').utils.toolbox.ToolboxDefinition;
   solution?: string;
 }

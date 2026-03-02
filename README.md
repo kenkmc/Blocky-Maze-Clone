@@ -62,6 +62,18 @@ src/
   style.css        # Layout, workspace, and maze visuals
 ```
 
+## Computational Thinking Progression
+
+The level sequence now follows an explicit curriculum:
+
+1. **Sequence** (Levels 1-5): movement order, turns, and orientation.
+2. **Loops** (Levels 6-9): repeat patterns and counted repetition.
+3. **Variables + Loops** (Levels 10-11): counter-based movement planning.
+4. **Selection** (Levels 12-16): `if` / `if-else` path decisions.
+5. **Integration** (Levels 17-21): combine variables, selection, and loops.
+
+Each level includes a dedicated `learningFocus` and required concept tags in `src/mazeLevels.ts`.
+
 ## Customising Levels
 
 Level definitions live in `src/mazeLevels.ts`. Each level specifies a grid map using characters:
@@ -72,6 +84,17 @@ Level definitions live in `src/mazeLevels.ts`. Each level specifies a grid map u
 - `G` – goal tile
 
 Adjust the `map`, `startDirection`, `maxBlocks`, `toolbox`, and `intro` fields to craft new challenges. A helper script (`scripts/generateLevels.js`) can be used to sketch new corridor layouts. Rebuild or restart the dev server after editing level data to ensure changes propagate.
+
+### Answer-first level design workflow
+
+For every level, authoring follows this order:
+
+1. Define `learningFocus` and `requiredConcepts`.
+2. Write a canonical `referenceProgram` that intentionally uses those concepts.
+3. Run built-in validation (on app load/build) to confirm the answer reaches the goal and covers required concepts.
+4. Only then finalize or redraw the maze layout.
+
+If a canonical answer is incorrect (hits walls / never reaches goal / misses required concepts), startup/build fails early with a descriptive error.
 
 ## Troubleshooting
 

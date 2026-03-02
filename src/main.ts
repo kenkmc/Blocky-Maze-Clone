@@ -174,6 +174,10 @@ const blockCounter = requireElement<HTMLSpanElement>('#block-counter');
 const levelName = requireElement<HTMLHeadingElement>('#level-name');
 const levelIntro = requireElement<HTMLParagraphElement>('#level-intro');
 const mazeGrid = requireElement<HTMLDivElement>('#maze-grid');
+const mazePanel = requireElement<HTMLElement>('.maze-panel');
+const mazePanelHeader = requireElement<HTMLElement>('.maze-panel__header');
+const mazePanelFooter = requireElement<HTMLElement>('.maze-panel__footer');
+const mazeMetrics = requireElement<HTMLElement>('.metrics');
 const blocklyArea = requireElement<HTMLDivElement>('#blockly-area');
 const blocklyDiv = requireElement<HTMLDivElement>('#blockly-div');
 const prevButton = requireElement<HTMLButtonElement>('#prev-button');
@@ -220,7 +224,10 @@ const tileLookup = new Map<string, HTMLDivElement>();
 // Cache the last block in the main statement stack so toolbox clicks can chain reliably.
 let workspaceTail: Blockly.Block | null = null;
 
-window.addEventListener('resize', () => resizeBlocklyWorkspace(blocklyArea, blocklyDiv));
+window.addEventListener('resize', () => {
+  resizeBlocklyWorkspace(blocklyArea, blocklyDiv);
+  fitMazeGrid(currentLevel);
+});
 resizeBlocklyWorkspace(blocklyArea, blocklyDiv);
 
 let { profile: playerProfile, needsName: requiresNamePrompt } = loadPlayerProfile();
@@ -453,9 +460,10 @@ function loadLevel(level: MazeLevel): void {
   const levelInfo = t.levels[level.id as keyof typeof t.levels];
   const displayName = levelInfo ? levelInfo.name : level.name;
   const displayIntro = levelInfo ? levelInfo.intro : level.intro;
+  const focusLine = `${t.ui.learningFocusLabel} ${level.learningFocus}`;
 
   levelName.textContent = `${level.id}. ${displayName}`;
-  levelIntro.textContent = displayIntro;
+  levelIntro.textContent = `${displayIntro} ${focusLine}`;
   setStatus('idle', t.ui.statusIdle);
   updateLevelProgress();
   resetRunTimerDisplay();
@@ -528,6 +536,43 @@ function renderMazeGrid(level: MazeLevel): void {
   }
 
   mazeGrid.appendChild(fragment);
+  fitMazeGrid(level);
+}
+
+function fitMazeGrid(level: MazeLevel): void {
+  const rows = level.tiles.length;
+  const cols = level.tiles[0]?.length ?? 1;
+  if (rows <= 0 || cols <= 0) {
+    return;
+  }
+
+  const panelRect = mazePanel.getBoundingClientRect();
+  const headerHeight = mazePanelHeader.getBoundingClientRect().height;
+  const metricsHeight = mazeMetrics.getBoundingClientRect().height;
+  const footerHeight = mazePanelFooter.getBoundingClientRect().height;
+
+  const panelStyles = window.getComputedStyle(mazePanel);
+  const panelPaddingY = parseFloat(panelStyles.paddingTop) + parseFloat(panelStyles.paddingBottom);
+  const panelGap = parseFloat(panelStyles.rowGap || panelStyles.gap || '0');
+
+  const availableHeight = Math.max(160, panelRect.height - panelPaddingY - headerHeight - metricsHeight - footerHeight - panelGap * 3);
+  const availableWidth = Math.max(220, panelRect.width - 8);
+
+  const gridStyles = window.getComputedStyle(mazeGrid);
+  const gridGap = parseFloat(gridStyles.columnGap || '0');
+  const gridPaddingX = parseFloat(gridStyles.paddingLeft) + parseFloat(gridStyles.paddingRight);
+  const gridPaddingY = parseFloat(gridStyles.paddingTop) + parseFloat(gridStyles.paddingBottom);
+
+  const cellByWidth = (availableWidth - gridPaddingX - gridGap * (cols - 1)) / cols;
+  const cellByHeight = (availableHeight - gridPaddingY - gridGap * (rows - 1)) / rows;
+  const cellSize = Math.max(14, Math.floor(Math.min(cellByWidth, cellByHeight)));
+
+  const fittedWidth = gridPaddingX + cellSize * cols + gridGap * (cols - 1);
+  const fittedHeight = gridPaddingY + cellSize * rows + gridGap * (rows - 1);
+
+  mazeGrid.style.setProperty('--cell-size', `${cellSize}px`);
+  mazeGrid.style.width = `${Math.floor(fittedWidth)}px`;
+  mazeGrid.style.height = `${Math.floor(fittedHeight)}px`;
 }
 
 function updateBlockCounter(): void {
@@ -881,7 +926,7 @@ function hideBillboard(): void {
 }
 
 function showAnswer(): void {
-  const solution = (t.levels as any)[currentLevel.id]?.solution || currentLevel.solution;
+  const solution = currentLevel.solution || (t.levels as any)[currentLevel.id]?.solution;
   if (!solution) {
     setStatus('warning', 'No solution hint available for this level.');
     return;
@@ -1064,8 +1109,6 @@ function createBaseToolbox(): Blockly.utils.toolbox.ToolboxDefinition {
       { kind: 'block', type: 'maze_turn_right' },
       { kind: 'sep' },
       { kind: 'block', type: 'maze_repeat_until_goal' },
-      { kind: 'block', type: 'maze_if_path' },
-      { kind: 'block', type: 'maze_if_else_path' },
       { kind: 'sep' },
       { kind: 'block', type: 'controls_repeat_ext', inputs: { TIMES: { block: { type: 'math_number', fields: { NUM: 5 } } } } },
       { kind: 'block', type: 'logic_compare' },
